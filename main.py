@@ -26,15 +26,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class CustomGeminiChatModel(BaseChatModel):
-    model_name: str = "gemini-pro"
+# class CustomGeminiChatModel(BaseChatModel):
+#     model_name: str = "gemini-pro"
 
-    @property
-    def _llm_type(self) -> str:
-        return "custom-gemini"
+#     @property
+#     def _llm_type(self) -> str:
+#         return "custom-gemini"
 
-    def _generate(self, messages: List[HumanMessage], stop: Optional[List[str]] = None, **kwargs: Any):
-        raise NotImplementedError("Synchronous generation is not implemented. Use _stream instead.")
+#     def _generate(self, messages: List[HumanMessage], stop: Optional[List[str]] = None, **kwargs: Any):
+#         raise NotImplementedError("Synchronous generation is not implemented. Use _stream instead.")
 
     # def _stream(self, messages: List[HumanMessage], stop: Optional[List[str]] = None, **kwargs: Any) -> Iterator[ChatGeneration]:
     #     user_input = messages[-1].content
@@ -44,15 +44,45 @@ class CustomGeminiChatModel(BaseChatModel):
     #     for chunk in response:
     #         if chunk.text:
     #             yield ChatGeneration(message=HumanMessage(content=chunk.text))
+    # def _stream(self, messages: List[HumanMessage], stop: Optional[List[str]] = None, **kwargs: Any) -> Iterator[ChatGeneration]:
+    #     user_input = messages[-1].content
+    #     model = genai.GenerativeModel(self.model_name)
+    #     response = model.generate_content(user_input, stream=True)
+
+    #     for chunk in response:
+    #         if chunk.text:
+    #             # Split the chunk into smaller pieces for smoother streaming
+    #             for piece in self._split_text(chunk.text, max_length=10):  # Split into 20-character chunks
+    #                 yield ChatGeneration(message=HumanMessage(content=piece))
+
+    # def _split_text(self, text: str, max_length: int) -> List[str]:
+    #     """Split text into smaller chunks."""
+    #     return [text[i:i + max_length] for i in range(0, len(text), max_length)]
+
+
+class CustomGeminiChatModel(BaseChatModel):
+    model_name: str = "gemini-pro"
+
+    @property
+    def _llm_type(self) -> str:
+        return "custom-gemini"
+
+    def _generate(self, messages: List[HumanMessage], stop: Optional[List[str]] = None, **kwargs: Any):
+        # 명시적으로 동기화 생성을 막음
+        raise NotImplementedError("Synchronous generation is not implemented. Use _stream instead.")
+
     def _stream(self, messages: List[HumanMessage], stop: Optional[List[str]] = None, **kwargs: Any) -> Iterator[ChatGeneration]:
         user_input = messages[-1].content
         model = genai.GenerativeModel(self.model_name)
         response = model.generate_content(user_input, stream=True)
 
         for chunk in response:
+            # finish_reason 검사
+            if getattr(chunk, "finish_reason", None) in [3, 4]:
+                print(f"Skipping chunk due to finish_reason: {chunk.finish_reason}")
+                continue
             if chunk.text:
-                # Split the chunk into smaller pieces for smoother streaming
-                for piece in self._split_text(chunk.text, max_length=10):  # Split into 20-character chunks
+                for piece in self._split_text(chunk.text, max_length=10):
                     yield ChatGeneration(message=HumanMessage(content=piece))
 
     def _split_text(self, text: str, max_length: int) -> List[str]:
